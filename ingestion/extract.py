@@ -43,6 +43,14 @@ MIN_WORDS_PER_LINE = 3.0
 # Above this word count a block is prose regardless of its line shape.
 ALWAYS_KEEP_WORD_COUNT = 25
 
+# Results tables survive the words-per-line test, because a flattened table row
+# ("T5-Small 2.08E+00 1.80E+20 60 1,000 3 3 1 0.5") is long and has many tokens
+# per line. They are still useless as retrievable text: column headers are gone,
+# so the numbers mean nothing. What distinguishes them is composition, not
+# shape - prose is overwhelmingly alphabetic, table rows are mostly numeric.
+MIN_ALPHABETIC_TOKEN_RATIO = 0.5
+HAS_LETTER = re.compile(r"[A-Za-z]")
+
 # The vertical stamp arXiv prints down the margin of page 1, e.g.
 # "arXiv:1810.04805v2  [cs.CL]  24 May 2019". The trailing date has to be part
 # of the pattern: stripping only up to "[cs.CL]" leaves "24 May 2019" behind,
@@ -67,13 +75,39 @@ NUMBERED_HEADING = re.compile(r"^(?P<number>\d+(?:\.\d+){0,3})\.?\s+(?P<title>[A
 # (GPT-3) have a ToC, and treating its entries as headings creates a phantom
 # duplicate of every real section.
 TOC_PAGE_NUMBER = re.compile(r"\s\d{1,3}$")
+
+# Appendices are lettered, not numbered: "A Details of Common Crawl Filtering",
+# "H.5 Results for Scramble Tasks". Worth detecting because appendix PROSE is
+# often genuinely answer-bearing (method details that did not fit in the body);
+# it was only the appendix TABLES that were polluting retrieval, and those are
+# handled by the composition filter above.
+LETTERED_HEADING = re.compile(r"^(?P<number>[A-Z](?:\.\d+){0,2})\s+(?P<title>[A-Z].{1,80})$")
+
+# A single leading capital is a weak signal - "A Transformer uses attention" has
+# the same shape as "A Details of Common Crawl Filtering". Title case is what
+# separates them, so lettered headings must look like titles, not sentences.
+TITLE_CASE_STOPWORDS = {
+    "a", "an", "the", "of", "and", "or", "for", "in", "on", "with", "to",
+    "from", "by", "at", "as", "is", "are", "via", "over", "into",
+}
+MIN_TITLE_CASE_RATIO = 0.6
+#
+# Generic single words - "Model", "Method", "Results", "Approach" - are
+# deliberately NOT in this set, even though papers do use them as headings.
+# They are also the most common column headers in results tables, and a table
+# header that is mistaken for a heading swallows everything after it: GPT-3's
+# "Model" column header produced a phantom 50,000-character section. The risks
+# are asymmetric. A missed heading merges a section into its neighbour, which
+# costs some citation precision; a false heading corrupts the document's whole
+# structure from that point on. Papers that section on these words almost
+# always number them ("3 Model"), which the numbered pattern catches anyway.
 UNNUMBERED_HEADINGS = {
     "abstract", "introduction", "background", "related work", "prior work",
-    "method", "methods", "methodology", "approach", "model", "model architecture",
-    "experiments", "experimental setup", "experiments and results", "results",
-    "evaluation", "analysis", "ablation study", "discussion", "limitations",
+    "model architecture", "experimental setup", "experiments and results",
+    "ablation study", "ablation studies", "discussion", "limitations",
     "conclusion", "conclusions", "conclusion and future work", "future work",
-    "broader impact", "ethics statement", "acknowledgments", "acknowledgements",
+    "broader impact", "broader impacts", "ethics statement",
+    "acknowledgments", "acknowledgements",
     "references", "bibliography", "appendix",
 }
 MAX_HEADING_WORDS = 10
@@ -188,7 +222,26 @@ def heading_of(block_text: str) -> str | None:
         if title.endswith(".") or TOC_PAGE_NUMBER.search(title):
             return None
         return f"{match.group('number')} {title}"
+
+    match = LETTERED_HEADING.match(stripped)
+    if match:
+        title = match.group("title").strip()
+        if title.endswith(".") or TOC_PAGE_NUMBER.search(title):
+            return None
+        if not looks_like_title(title):
+            return None
+        return f"{match.group('number')} {title}"
+
     return None
+
+
+def looks_like_title(title: str) -> bool:
+    """True if `title` is capitalised like a heading rather than a sentence."""
+    significant = [word for word in title.split() if word.lower() not in TITLE_CASE_STOPWORDS]
+    if not significant:
+        return False
+    capitalised = sum(1 for word in significant if word[:1].isupper())
+    return capitalised / len(significant) >= MIN_TITLE_CASE_RATIO
 
 
 def is_content_block(block_text: str) -> bool:
@@ -197,6 +250,15 @@ def is_content_block(block_text: str) -> bool:
     if not lines:
         return False
     words = block_text.split()
+    if not words:
+        return False
+
+    # Composition test first: it is the only one that catches flattened table
+    # rows, which are long enough to pass every shape-based check below.
+    alphabetic = sum(1 for word in words if HAS_LETTER.search(word))
+    if alphabetic / len(words) < MIN_ALPHABETIC_TOKEN_RATIO:
+        return False
+
     if len(words) >= ALWAYS_KEEP_WORD_COUNT:
         return True
     return len(words) / len(lines) >= MIN_WORDS_PER_LINE
