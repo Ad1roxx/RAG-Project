@@ -22,8 +22,8 @@ arXiv  ->  extract  ->  chunk  ->  embed  ->  vector store
 | # | Stage | Status |
 |---|---|---|
 | 1 | Data ingestion — fetch from arXiv, PDF → clean structured text | ✅ done |
-| 2 | Chunking + embeddings + vector store | next |
-| 3 | Retrieval + re-ranking | |
+| 2 | Chunking + embeddings + vector store | ✅ done |
+| 3 | Retrieval + re-ranking | next |
 | 4 | Generation with citations | |
 | 5 | Evaluation harness (retrieval + faithfulness) | |
 | 6 | FastAPI service | |
@@ -44,18 +44,25 @@ cp .env.example .env              # fill in API keys when Sprint 4 lands
 
 python -m ingestion.fetch_papers  # download the seed corpus from arXiv
 python -m ingestion.extract       # PDFs -> data/processed/*.json
+python -m ingestion.chunk         # sections -> retrievable passages
+python -m rag.store build         # embed + index (~31s on CPU)
+
+python -m rag.store query "What is the purpose of multi-head attention?" -k 5
 ```
 
 Current corpus: 10 interlinked ML/AI papers (Transformer → BERT → GPT-3; Sentence-BERT → DPR → RAG),
-206 sections, ~492K characters of cleaned text.
+206 sections → 392 chunks → a 384-dim FAISS index.
 
-`data/` is gitignored — the corpus is reproducible from the two commands above rather than
-committed to the repo.
+Embeddings run locally (`BAAI/bge-small-en-v1.5`) — no API key, no cost.
+
+`data/` is gitignored — raw PDFs, processed text, chunks and the index are all derived state,
+rebuilt by the commands above rather than committed to the repo.
 
 ## Layout
 
 ```
-ingestion/     fetch_papers.py, extract.py  — arXiv -> clean sectioned text
+ingestion/     fetch_papers.py, extract.py, chunk.py  — arXiv -> clean sectioned text -> passages
+rag/           embed.py, store.py  — local embeddings + FAISS vector search
 explanations/  per-sprint write-ups: what was built, why, and what to understand
 CLAUDE.md      how this project is built
 PROJECT_PLAN.md  scope, build order, and what is deliberately out of scope
@@ -67,3 +74,4 @@ Each sprint has a self-contained write-up in [`explanations/`](explanations/) co
 decisions, the concepts involved, and the trade-offs taken.
 
 - [Sprint 1 — Data ingestion](explanations/sprint-01.md)
+- [Sprint 2 — Chunking, embeddings and the vector store](explanations/sprint-02.md)
