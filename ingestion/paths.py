@@ -18,8 +18,15 @@ METADATA_DIR = RAW_DIR / "metadata"
 # Stage 2 output: cleaned text + structure, one JSON per paper.
 PROCESSED_DIR = DATA_DIR / "processed"
 
+# Stage 3 output: retrievable passages, one JSON object per line.
+CHUNKS_DIR = DATA_DIR / "chunks"
+CHUNKS_FILE = CHUNKS_DIR / "chunks.jsonl"
+
+# Stage 4 output: the FAISS index plus the chunk metadata it maps onto.
+INDEX_DIR = DATA_DIR / "index"
+
 
 def ensure_dirs() -> None:
     """Create every data directory we write to. Safe to call repeatedly."""
-    for directory in (PDF_DIR, METADATA_DIR, PROCESSED_DIR):
+    for directory in (PDF_DIR, METADATA_DIR, PROCESSED_DIR, CHUNKS_DIR, INDEX_DIR):
         directory.mkdir(parents=True, exist_ok=True)
