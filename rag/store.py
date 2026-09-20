@@ -59,6 +59,10 @@ MANIFEST_FILE = "manifest.json"
 class SearchResult:
     score: float
     chunk: dict
+    # The index row this came from. Kept because re-ranking and MMR need the
+    # candidate's own vector back, and reconstructing it from the index is
+    # cheaper and safer than re-embedding the text.
+    row: int = -1
 
     def citation(self) -> str:
         pages = (
@@ -150,8 +154,14 @@ class VectorStore:
             # FAISS returns -1 when fewer than k vectors exist.
             if row == -1:
                 continue
-            results.append(SearchResult(score=float(score), chunk=self.chunks[row]))
+            results.append(
+                SearchResult(score=float(score), chunk=self.chunks[row], row=int(row))
+            )
         return results
+
+    def vectors_for(self, rows: list[int]) -> np.ndarray:
+        """Recover the stored (already normalised) vectors for given rows."""
+        return np.vstack([self.index.reconstruct(int(row)) for row in rows])
 
     def assert_matches(self, embedder: Embedder) -> None:
         """Refuse to search an index built by a different embedding model.
