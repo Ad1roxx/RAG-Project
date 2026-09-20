@@ -1,0 +1,13 @@
+# Normalise line endings in the repo; check out native on each platform.
+* text=auto
+
+# Files that MUST keep LF: CRLF breaks these inside Linux containers.
+*.sh text eol=lf
+Dockerfile* text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Binary
+*.pdf binary
+*.png binary
+*.faiss binary
