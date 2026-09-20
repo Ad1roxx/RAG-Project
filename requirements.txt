@@ -1,4 +1,13 @@
-# Sprint 1 — data ingestion
-requests==2.32.3        # arXiv API calls + PDF downloads
-PyMuPDF==1.24.10        # PDF -> text extraction
-python-dotenv==1.0.1    # load .env for local dev
+# --- Sprint 1: data ingestion ---
+requests==2.32.3                  # arXiv API calls + PDF downloads
+PyMuPDF==1.24.10                  # PDF -> text extraction
+python-dotenv==1.0.1              # load .env for local dev
+
+# --- Sprint 2: chunking, embeddings, vector store ---
+# Pinned: an embedding model change silently invalidates the index, so the
+# versions that produced the current vectors are part of the contract.
+sentence-transformers==3.1.1      # embedding model wrapper (BAAI/bge-small-en-v1.5)
+transformers==4.57.6              # tokenizer used to size chunks in model tokens
+torch==2.14.0                     # CPU backend for the embedding model
+faiss-cpu==1.8.0.post1            # exact inner-product similarity search
+numpy==1.26.4
