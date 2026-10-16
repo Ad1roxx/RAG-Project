@@ -87,3 +87,8 @@ decisions, the concepts involved, and the trade-offs taken.
 - [Sprint 1 — Data ingestion](explanations/sprint-01.md)
 - [Sprint 2 — Chunking, embeddings and the vector store](explanations/sprint-02.md)
 - [Sprint 3 — Retrieval and re-ranking](explanations/sprint-03.md)
+
+## Project state
+
+[`HANDOFF.md`](HANDOFF.md) is the current-state snapshot: what exists, the measured numbers, which
+decisions are settled and why, what the known debts are, and which decisions are still open.
